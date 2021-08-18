@@ -1,0 +1,164 @@
+---
+title: "data-viz"
+author: "Peter Menzies"
+date: "8/18/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# general use
+library(tidyverse)
+library(here)
+library(janitor)
+
+# dataviz
+library(patchwork)
+library(ggrepel)
+library(gghighlight)
+library(paletteer)
+library(ggbeeswarm)
+
+library(gapminder)
+
+library(sf)
+```
+
+## Get the lizards data
+
+```{r}
+lizards <- read_csv(here("data_tidy", "lizards.csv"))
+```
+
+## Make the worlds worst histogram of lizard weights
+
+```{r}
+ggplot(data = lizards, aes(x = weight)) +
+  geom_histogram(fill = "light blue",
+                 color = "purple",
+                 size = 0.5,
+                 linetype = "dotted")
+```
+
+```{r}
+ggplot(lizards, aes(x = total_length, y = weight)) +
+  geom_point(shape = 2,
+             fill = "black",
+             alpha = 1,
+             color = "pink",
+             size = 4) +
+  theme_bw()
+```
+
+```{r}
+ggplot(lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name, size = total_length),
+             shape = 22,
+             fill = "black")
+```
+
+```{r}
+ggplot(lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name)) +
+  theme_light() +
+  facet_wrap(~common_name)
+```
+
+```{r}
+ggplot(lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = common_name)) +
+  facet_grid(sex ~ tail)
+```
+
+## Getting things in order
+
+Find total lizard counts by common_name
+
+```{r}
+lizard_counts <- lizards %>% 
+  group_by(common_name) %>% 
+  summarize(n = n())
+
+# another way to do this (awesome if you JUST want to find counts, but the previous method is necessary if you want to do more operations than just count)
+
+lizard_counts <- lizards %>% count(common_name)
+```
+
+Convert common_name to an ordered factor
+
+```{r}
+lizard_counts <- lizard_counts %>% 
+  mutate(common_name = fct_reorder(common_name, n))
+```
+
+
+```{r}
+ggplot(lizard_counts, aes(y = fct_reorder(common_name, n), x = n)) +
+  geom_col(aes(fill = common_name)) +
+  labs(x = "Number of individuals", 
+       y = "Common name", 
+       title = "Lizard Counts")
+```
+
+## Axis scale breaks, limits, and labels
+
+Scatterplot of total length vs weight
+
+```{r}
+ggplot(lizards, aes(x = total_length, y = weight)) +
+  geom_point() +
+  scale_x_continuous(breaks = seq(0, 450, 50),
+                     limits = c(0, 460),
+                     expand = c(0, 5)) +
+  scale_y_continuous(expand = c(0, 2))
+
+```
+Transform the date column to class Date, then find counts of observations by date
+
+```{r}
+lizard_counts <- lizards %>% 
+  mutate(date = lubridate::mdy(date)) %>% 
+  group_by(date) %>% 
+  summarize(count = n())
+```
+
+```{r}
+ggplot(lizard_counts, aes(x = date, y = count)) +
+  geom_line(color = "blue") +
+  scale_x_date(date_breaks = "3 years",
+               date_labels = "%Y")
+```
+
+```{r}
+ggplot(lizards, aes(x = total_length, y = weight)) +
+  geom_point(aes(color = weight)) +
+  scale_color_stepsn(colors = c("green", "blue", "purple", "pink"), 
+                     breaks = c(0, 1, 2, 3, 4, 5, 10, 20, 40 , 50))
+```
+
+### Update a color scheme using a pallette in palletteer
+
+```{r}
+lizards_fct <- lizards %>% 
+  mutate(common_name = fct_reorder(common_name, total_length, median))
+
+ggplot(lizards_fct, aes(y = common_name, x = total_length)) +
+  geom_boxplot(aes(fill = common_name), show.legend = FALSE) +
+  scale_fill_paletteer_d(palette = "beyonce::X125")
+```
+
+#### Within `theme()`, the thing with the highest resolution will take precedence (e.g. `panel.grid.major.x` carries more weight than `panel.grid.major`)
+
+```{r}
+ggplot(lizards, aes(x = total_length, y = weight)) +
+  geom_point() +
+  theme(
+    panel.grid.major.x = element_line(color = "red"),
+    panel.grid.major = element_line(color = "blue"),
+    plot.background = element_rect(fill = "cyan4"),
+    axis.text.x = element_text(color = "pink"),
+    panel.background = element_blank()
+  )
+```
+
